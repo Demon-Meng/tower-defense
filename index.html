@@ -612,6 +612,7 @@ function buildMobilePanel(){
       e.preventDefault();
       const t0=e.touches[0];
       dragType=id;
+      touchStartX=t0.clientX;touchStartY=t0.clientY;touchMoved=false;
       const ghost=document.getElementById('dragGhost');
       ghost.textContent=TOWERS[id].icon;ghost.style.display='block';
       ghost.style.left=(t0.clientX-16)+'px';ghost.style.top=(t0.clientY-16)+'px';
@@ -651,14 +652,14 @@ canvas.addEventListener('click',()=>{
 canvas.addEventListener('contextmenu',e=>{e.preventDefault();selType=null;selTower=null;showTowerInfo(null);updateUI();});
 
 // ─── Touch support ────────────────────────────────────────────
-let touchStartX=0,touchStartY=0,touchMoved=false;
+let touchStartX=0,touchStartY=0,touchMoved=false,touchFromCanvas=false;
 
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
   const t=e.touches[0],r=canvas.getBoundingClientRect();
   mx=(t.clientX-r.left)*(GW/r.width);my=(t.clientY-r.top)*(GH/r.height);
   hCol=Math.floor(mx/CS);hRow=Math.floor(my/CS);
-  touchStartX=t.clientX;touchStartY=t.clientY;touchMoved=false;
+  touchStartX=t.clientX;touchStartY=t.clientY;touchMoved=false;touchFromCanvas=true;
 },{passive:false});
 
 document.addEventListener('touchmove',e=>{
@@ -670,9 +671,10 @@ document.addEventListener('touchmove',e=>{
     const r=canvas.getBoundingClientRect();
     mx=(t.clientX-r.left)*(GW/r.width);my=(t.clientY-r.top)*(GH/r.height);
     hCol=Math.floor(mx/CS);hRow=Math.floor(my/CS);
+    if(Math.abs(t.clientX-touchStartX)>8||Math.abs(t.clientY-touchStartY)>8)touchMoved=true;
     return;
   }
-  if(e.target===canvas){
+  if(touchFromCanvas){
     e.preventDefault();
     const t=e.touches[0],r=canvas.getBoundingClientRect();
     mx=(t.clientX-r.left)*(GW/r.width);my=(t.clientY-r.top)*(GH/r.height);
@@ -681,12 +683,12 @@ document.addEventListener('touchmove',e=>{
   }
 },{passive:false});
 
-canvas.addEventListener('touchend',e=>{
-  e.preventDefault();
-  // Drag-and-drop placement
+document.addEventListener('touchend',e=>{
+  // Drag-and-drop placement (from tower card to canvas)
   if(dragType){
+    e.preventDefault();
     const ghost=document.getElementById('dragGhost');ghost.style.display='none';
-    if(hCol>=0&&hRow>=0&&hCol<COLS&&hRow<ROWS&&!grid[hRow][hCol]&&validCell(hCol,hRow)){
+    if(touchMoved&&hCol>=0&&hRow>=0&&hCol<COLS&&hRow<ROWS&&!grid[hRow][hCol]&&validCell(hCol,hRow)){
       const t=TOWERS[dragType];
       if(gold>=t.cost){
         gold-=t.cost;
@@ -696,9 +698,14 @@ canvas.addEventListener('touchend',e=>{
         selType=null;updateUI();
       }
     }
-    dragType=null;return;
+    dragType=null;touchFromCanvas=false;return;
   }
-  if(!touchMoved)canvas.click();
+  // Tap on canvas
+  if(touchFromCanvas&&!touchMoved){
+    e.preventDefault();
+    canvas.click();
+  }
+  touchFromCanvas=false;
 },{passive:false});
 
 document.getElementById('btnWave').onclick=()=>{
