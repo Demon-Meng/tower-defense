@@ -119,7 +119,7 @@ function resizeCanvas(){
   const mobile=window.innerWidth<=768;
   const sb=mobile?0:(document.getElementById('sidebar').offsetWidth||260);
   const mp=mobile?(document.getElementById('mobilePanel').offsetHeight||140):0;
-  const aw=window.innerWidth-sb, ah=window.innerHeight-mp;
+  const aw=Math.max(200,window.innerWidth-sb), ah=Math.max(150,window.innerHeight-mp);
   const aspect=GW/GH;
   let w,h;
   if(aw/ah<aspect){w=aw;h=aw/aspect;}else{h=ah;w=ah*aspect;}
@@ -686,11 +686,11 @@ document.addEventListener('touchmove',e=>{
 document.addEventListener('touchend',e=>{
   // Drag-and-drop placement (from tower card to canvas)
   if(dragType){
-    e.preventDefault();
     const ghost=document.getElementById('dragGhost');ghost.style.display='none';
     if(touchMoved&&hCol>=0&&hRow>=0&&hCol<COLS&&hRow<ROWS&&!grid[hRow][hCol]&&validCell(hCol,hRow)){
       const t=TOWERS[dragType];
       if(gold>=t.cost){
+        e.preventDefault();
         gold-=t.cost;
         grid[hRow][hCol]=2;
         towers.push({type:dragType,col:hCol,row:hRow,x:hCol*CS+CS/2,y:hRow*CS+CS/2,
@@ -717,8 +717,8 @@ document.getElementById('btnWave').onclick=()=>{
   spawnInterval=Math.max(12,42-waveNum*2-lvl);
   state='waving';document.getElementById('btnWave').textContent='进行中...';updateUI();
 };
-document.getElementById('btnSpeed').onclick=function(){speed=speed===1?2:speed===2?3:1;this.textContent=speed+'x';};
-document.getElementById('btnPause').onclick=()=>{paused=!paused;document.getElementById('btnPause').textContent=paused?'继续':'暂停';};
+document.getElementById('btnSpeed').onclick=function(){speed=speed===1?2:speed===2?3:1;this.textContent=speed+'x';const mb=document.getElementById('mSpeed');if(mb)mb.textContent=speed+'x';};
+document.getElementById('btnPause').onclick=()=>{paused=!paused;document.getElementById('btnPause').textContent=paused?'继续':'暂停';const mb=document.getElementById('mPause');if(mb)mb.textContent=paused?'继续':'暂停';};
 
 document.addEventListener('keydown',e=>{
   if(e.code==='Space'){e.preventDefault();document.getElementById('btnWave').click();}
@@ -734,7 +734,12 @@ document.addEventListener('keydown',e=>{
 
 // ─── Loop ─────────────────────────────────────────────────────
 let lastT=0;
-function loop(ts){const dt=ts-lastT;if(dt>=16/speed){lastT=ts;update();draw();}requestAnimationFrame(loop);}
+function loop(ts){
+  try{
+    const dt=ts-lastT;if(dt>=16/speed){lastT=ts;update();draw();}
+  }catch(e){console.error('Game error:',e);}
+  requestAnimationFrame(loop);
+}
 buildShop();buildMobilePanel();initLevel(0,false);resizeCanvas();requestAnimationFrame(loop);
 </script>
 </body>
