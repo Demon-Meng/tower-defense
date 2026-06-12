@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星际防线 - 塔防大战</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#161638;font-family:'Segoe UI',Arial,sans-serif;color:#e8e8f0;overflow:hidden;height:100vh;height:100dvh;display:flex;justify-content:center;align-items:center}
+#wrap{display:flex;height:100vh;height:100dvh;max-height:100vh;position:relative}
+canvas{display:block;cursor:crosshair;flex-shrink:0;touch-action:none}
+#sidebar{width:260px;background:linear-gradient(180deg,#1a1a45 0%,#151540 100%);border-left:2px solid #2a2a60;display:flex;flex-direction:column;overflow:hidden}
+#sidebar h2{text-align:center;padding:10px 0 6px;font-size:18px;color:#00d4ff;text-shadow:0 0 15px rgba(0,212,255,.6);letter-spacing:2px;border-bottom:1px solid #2a2a60}
+#stats{padding:8px 14px;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:13px;border-bottom:1px solid #2a2a60}
+.stat{display:flex;align-items:center;gap:5px}
+.stat b{color:#00d4ff}
+#shop{flex:1;overflow-y:auto;padding:6px}
+#shop::-webkit-scrollbar{width:4px}
+#shop::-webkit-scrollbar-thumb{background:#2a2a60;border-radius:2px}
+.shop-title{font-size:12px;color:#aaa;margin:4px 0 3px;text-align:center}
+.tower-card{background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:pointer;transition:.15s}
+.tower-card:hover{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.12)}
+.tower-card.selected{border-color:#00d4ff;background:rgba(0,212,255,.1);box-shadow:0 0 10px rgba(0,212,255,.2)}
+.tower-card.disabled{opacity:.4;cursor:not-allowed}
+.tc-top{display:flex;align-items:center;gap:8px}
+.tc-icon{width:32px;height:32px;border-radius:6px;display:flex;justify-content:center;align-items:center;font-size:17px;flex-shrink:0}
+.tc-name{font-size:13px;font-weight:700}
+.tc-cost{font-size:11px;color:#ffcc00}
+.tc-desc{font-size:10px;color:#999;margin-top:3px;line-height:1.3}
+#abilities{padding:6px 10px;border-top:1px solid #2a2a60;border-bottom:1px solid #2a2a60;display:flex;gap:6px}
+.ab-btn{flex:1;padding:7px 4px;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);border-radius:8px;cursor:pointer;text-align:center;font-size:10px;color:#ddd;transition:.15s;position:relative}
+.ab-btn:hover{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.1)}
+.ab-btn.ready{border-color:rgba(0,255,150,.4);color:#0f8}
+.ab-btn.active{border-color:#00d4ff;background:rgba(0,212,255,.15)}
+.ab-btn .cd-overlay{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);color:#aaa;font-size:9px;text-align:center;padding:1px;border-radius:0 0 6px 6px}
+.ab-icon{font-size:18px;display:block}
+#towerInfo{border-top:1px solid #2a2a60;padding:10px;min-height:120px;display:none}
+#towerInfo.show{display:block}
+.ti-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ti-icon{width:28px;height:28px;border-radius:6px;display:flex;justify-content:center;align-items:center;font-size:16px}
+.ti-name{font-size:14px;font-weight:700}
+.ti-level{font-size:11px;color:#ffcc00}
+.ti-stats{font-size:11px;color:#bbb;line-height:1.7}
+.ti-stats span{color:#e0e0e0}
+.ti-btns{display:flex;gap:6px;margin-top:8px}
+.ti-btn{flex:1;padding:7px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#e8e8f0;border-radius:6px;font-size:12px;cursor:pointer;text-align:center;transition:.15s}
+.ti-btn:hover{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.15)}
+.ti-btn.upgrade{border-color:rgba(0,200,255,.3);color:#00d4ff}
+.ti-btn.upgrade:hover{background:rgba(0,200,255,.15)}
+.ti-btn.sell{border-color:rgba(255,100,100,.3);color:#ff6666}
+.ti-btn.sell:hover{background:rgba(255,100,100,.15)}
+.ti-btn.disabled{opacity:.4;cursor:not-allowed}
+#controls{padding:8px 10px;border-top:1px solid #2a2a60;display:flex;gap:6px}
+.ctrl-btn{flex:1;padding:7px 4px;border:2px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#ddd;border-radius:6px;font-size:11px;cursor:pointer;text-align:center;transition:.15s}
+.ctrl-btn:hover{border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.12)}
+.ctrl-btn.primary{border-color:rgba(0,200,255,.3);color:#00d4ff;font-weight:700}
+#waveInfo{text-align:center;padding:6px;font-size:11px;color:#aaa;border-top:1px solid #2a2a60}
+/* Mobile bottom panel */
+#mobilePanel{display:none}
+@media(max-width:768px){
+  #wrap{flex-direction:column}
+  #sidebar{display:none}
+  #mobilePanel{display:flex;flex-direction:column;background:linear-gradient(180deg,#1a1a45,#151540);border-top:2px solid #2a2a60;overflow:hidden}
+  #mStats{display:flex;justify-content:space-around;padding:5px 8px;font-size:12px;border-bottom:1px solid #2a2a60;flex-shrink:0}
+  #mStats .stat{gap:3px}
+  #mTowers{display:flex;gap:6px;padding:6px 8px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch}
+  #mTowers::-webkit-scrollbar{display:none}
+  .m-tower{flex-shrink:0;width:64px;padding:6px 4px;border-radius:8px;border:2px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);text-align:center;cursor:grab;transition:.15s}
+  .m-tower.selected{border-color:#00d4ff;background:rgba(0,212,255,.12)}
+  .m-tower.disabled{opacity:.35}
+  .m-tower .mt-icon{font-size:22px}
+  .m-tower .mt-name{font-size:9px;color:#ccc;margin-top:2px}
+  .m-tower .mt-cost{font-size:9px;color:#ffcc00}
+  #mBottom{display:flex;gap:6px;padding:5px 8px;border-top:1px solid #2a2a60;flex-shrink:0}
+  #mBottom .ab-btn{padding:8px 4px;font-size:11px}
+  #mBottom .ab-icon{font-size:20px}
+  #mBottom .ctrl-btn{padding:8px 4px;font-size:12px}
+  #dragGhost{display:none;position:fixed;z-index:200;pointer-events:none;font-size:32px;filter:drop-shadow(0 0 8px rgba(0,212,255,.6))}
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="gameCanvas"></canvas>
+<div id="sidebar">
+  <h2>星际防线</h2>
+  <div id="stats">
+    <div class="stat">📍 关卡 <b id="levelVal">1</b></div>
+    <div class="stat">🌊 波次 <b id="waveVal">0/20</b></div>
+    <div class="stat">💰 <b id="goldVal">250</b></div>
+    <div class="stat">❤️ <b id="livesVal">20</b></div>
+    <div class="stat">⭐ <b id="scoreVal">0</b></div>
+    <div class="stat">🔥 连杀 <b id="comboVal">0</b></div>
+  </div>
+  <div id="shop"><div class="shop-title">— 炮塔工坊 —</div></div>
+  <div id="abilities">
+    <div class="ab-btn ready" id="abStrike" title="轨道轰炸 (Q)"><span class="ab-icon">💥</span>轰炸</div>
+    <div class="ab-btn ready" id="abEMP" title="电磁脉冲 (W)"><span class="ab-icon">💠</span>脉冲</div>
+    <div class="ab-btn ready" id="abRepair" title="维修无人机 (E)"><span class="ab-icon">🔧</span>维修</div>
+  </div>
+  <div id="towerInfo"></div>
+  <div id="controls">
+    <div class="ctrl-btn primary" id="btnWave">开始波次</div>
+    <div class="ctrl-btn" id="btnSpeed">1x</div>
+    <div class="ctrl-btn" id="btnPause">暂停</div>
+  </div>
+  <div id="waveInfo">准备就绪</div>
+</div>
+<div id="mobilePanel">
+  <div id="mStats">
+    <div class="stat">📍<b id="mLevel">1/6</b></div>
+    <div class="stat">🌊<b id="mWave">0/20</b></div>
+    <div class="stat">💰<b id="mGold">250</b></div>
+    <div class="stat">❤️<b id="mLives">20</b></div>
+    <div class="stat">🔥<b id="mCombo">0</b></div>
+  </div>
+  <div id="mTowers"></div>
+  <div id="mBottom">
+    <div class="ab-btn ready" id="mStrike"><span class="ab-icon">💥</span>轰炸</div>
+    <div class="ab-btn ready" id="mEMP"><span class="ab-icon">💠</span>脉冲</div>
+    <div class="ab-btn ready" id="mRepair"><span class="ab-icon">🔧</span>维修</div>
+    <div class="ctrl-btn primary" id="mWave">开始</div>
+    <div class="ctrl-btn" id="mSpeed">1x</div>
+    <div class="ctrl-btn" id="mPause">暂停</div>
+  </div>
+</div>
+<div id="dragGhost"></div>
+</div>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const COLS=20,ROWS=16,CS=40,GW=COLS*CS,GH=ROWS*CS;
+canvas.width=GW; canvas.height=GH;
+
+function resizeCanvas(){
+  const mobile=window.innerWidth<=768;
+  const sb=mobile?0:(document.getElementById('sidebar').offsetWidth||260);
+  const mp=mobile?(document.getElementById('mobilePanel').offsetHeight||140):0;
+  const aw=window.innerWidth-sb, ah=window.innerHeight-mp;
+  const aspect=GW/GH;
+  let w,h;
+  if(aw/ah<aspect){w=aw;h=aw/aspect;}else{h=ah;w=ah*aspect;}
+  canvas.style.width=w+'px';canvas.style.height=h+'px';
+}
+window.addEventListener('resize',resizeCanvas);
+resizeCanvas();
+
+// ─── Levels ───────────────────────────────────────────────────
+const LEVELS=[
+  {name:'银河前线',path:[[0,1],[6,1],[6,5],[14,5],[14,1],[19,1],[19,8],[12,8],[12,11],[3,11],[3,14],[19,14]]},
+  {name:'虫洞迷途',path:[[0,8],[5,8],[5,2],[14,2],[14,12],[8,12],[8,6],[19,6]]},
+  {name:'星际漩涡',path:[[0,3],[16,3],[16,7],[4,7],[4,11],[16,11],[16,14],[19,14]]},
+  {name:'暗域走廊',path:[[0,1],[4,1],[4,7],[10,7],[10,1],[16,1],[16,14],[19,14]]},
+  {name:'引力弹弓',path:[[10,0],[10,4],[3,4],[3,10],[17,10],[17,4],[10,4],[10,12],[19,12]]},
+  {name:'母巢核心',path:[[0,7],[4,7],[4,2],[10,2],[10,7],[16,7],[16,12],[10,12],[10,7],[4,7],[4,14],[19,14]]}
+];
+const TOTAL_LV=LEVELS.length, WAVES_LV=20;
+
+// ─── Config ───────────────────────────────────────────────────
+const TOWERS={
+  laser:  {name:'激光塔',cost:80, dmg:20,range:120,rate:18,color:'#00ffcc',icon:'🔫',desc:'快速单体'},
+  missile:{name:'导弹塔',cost:130,dmg:55,range:150,rate:55,color:'#ff6600',icon:'🚀',desc:'范围溅射'},
+  freeze: {name:'冰冻塔',cost:100,dmg:8, range:130,rate:40,color:'#00ccff',icon:'❄️',desc:'减速50%'},
+  tesla:  {name:'电弧塔',cost:180,dmg:35,range:140,rate:45,color:'#cc66ff',icon:'⚡',desc:'链式3目标'},
+  sniper: {name:'狙击塔',cost:200,dmg:120,range:220,rate:90,color:'#ff3366',icon:'🎯',desc:'超远距高伤'},
+  flame:  {name:'烈焰塔',cost:160,dmg:12,range:100,rate:6, color:'#ff8800',icon:'🔥',desc:'持续灼烧'}
+};
+const ENEMIES={
+  scout:  {name:'侦察舰',hp:60, speed:2.2,reward:12,size:10,color:'#00ff88'},
+  cruiser:{name:'巡洋舰',hp:160,speed:1.3,reward:25,size:13,color:'#ff8844'},
+  heavy:  {name:'战列舰',hp:400,speed:0.8,reward:50,size:16,color:'#ff4466'},
+  boss:   {name:'母舰',  hp:800,speed:0.5,reward:180,size:22,color:'#ffcc00'}
+};
+const UPG_M=1.4, UPG_C=0.6;
+
+// ─── Abilities ────────────────────────────────────────────────
+const ABILITIES={
+  strike:{name:'轨道轰炸',cd:900,dmg:200,radius:80,desc:'选定区域轰炸'},
+  emp:   {name:'电磁脉冲',cd:1200,slowDur:300,desc:'全场减速60%'},
+  repair:{name:'维修无人机',cd:1500,heal:5,desc:'恢复5条命'}
+};
+
+// ─── State ────────────────────────────────────────────────────
+let lvl=0,gold=250,lives=20,score=0,difficulty=1;
+let enemies=[],towers=[],projectiles=[],particles=[],effects=[],dmgNums=[];
+let waveNum=0,waveQueue=[],spawnTimer=0,spawnInterval=50,autoWaveTimer=0;
+let state='idle',paused=false,speed=1,gameOver=false;
+let selType=null,selTower=null;
+let mx=-1,my=-1,hCol=-1,hRow=-1;
+// Combo
+let combo=0,comboTimer=0,comboPeak=0;
+// Screen shake
+let shakeX=0,shakeY=0,shakeAmt=0;
+// Abilities
+let abCD={strike:0,emp:0,repair:0};
+let abTargeting=null; // 'strike' when selecting target
+// Path runtime
+let pathSet,pathPixels,pathLens,totalLen,grid;
+
+function buildPath(coords){
+  const ps=new Set();
+  for(let i=0;i<coords.length-1;i++){
+    let[c1,r1]=coords[i],[c2,r2]=coords[i+1];
+    if(c1===c2){for(let r=Math.min(r1,r2);r<=Math.max(r1,r2);r++)ps.add(r*COLS+c1);}
+    else{for(let c=Math.min(c1,c2);c<=Math.max(c1,c2);c++)ps.add(r1*COLS+c);}
+  }
+  const px=coords.map(([c,r])=>({x:c*CS+CS/2,y:r*CS+CS/2}));
+  let t=0;const l=[0];
+  for(let i=1;i<px.length;i++){const dx=px[i].x-px[i-1].x,dy=px[i].y-px[i-1].y;t+=Math.sqrt(dx*dx+dy*dy);l.push(t);}
+  return{pathSet:ps,pathPixels:px,pathLens:l,totalPathLen:t};
+}
+function posOnPath(d){
+  if(d<=0)return{...pathPixels[0]};
+  if(d>=totalLen)return{...pathPixels[pathPixels.length-1]};
+  for(let i=1;i<pathLens.length;i++){
+    if(d<=pathLens[i]){const t=(d-pathLens[i-1])/(pathLens[i]-pathLens[i-1]);return{x:pathPixels[i-1].x+(pathPixels[i].x-pathPixels[i-1].x)*t,y:pathPixels[i-1].y+(pathPixels[i].y-pathPixels[i-1].y)*t};}
+  }
+  return{...pathPixels[pathPixels.length-1]};
+}
+function validCell(c,r){return c>=0&&c<COLS&&r>=0&&r<ROWS&&grid[r][c]===0;}
+
+function initLevel(l,keep){
+  lvl=l;const lv=LEVELS[l];const b=buildPath(lv.path);
+  pathSet=b.pathSet;pathPixels=b.pathPixels;pathLens=b.pathLens;totalLen=b.totalPathLen;
+  grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  pathSet.forEach(k=>{grid[Math.floor(k/COLS)][k%COLS]=1;});
+  if(!keep){gold=250;lives=20;score=0;}
+  enemies=[];towers=[];projectiles=[];particles=[];effects=[];dmgNums=[];
+  waveNum=0;waveQueue=[];spawnTimer=0;combo=0;comboTimer=0;comboPeak=0;
+  abCD={strike:0,emp:0,repair:0};abTargeting=null;
+  state='idle';gameOver=false;paused=false;
+  selType=null;selTower=null;showTowerInfo(null);
+  document.getElementById('btnWave').textContent='开始波次';
+  document.getElementById('btnPause').textContent='暂停';
+  updateUI();
+}
+
+// ─── Waves ────────────────────────────────────────────────────
+function genWave(n){
+  const q=[];
+  if(n%10===0){
+    // Boss wave: 1-2 bosses + escort fleet
+    const bossCount=n>=20?2:1;
+    for(let i=0;i<bossCount;i++)q.push('boss');
+    for(let i=0;i<8+lvl*2;i++)q.push('cruiser');
+    for(let i=0;i<5+lvl;i++)q.push('heavy');
+    return q;
+  }
+  // Normal wave: more enemies, gradual type mix
+  const baseCount=6+n*1.5+lvl*2;
+  const count=Math.floor(baseCount*difficulty);
+  const types=n<3?['scout']:n<5?['scout','cruiser']:n<8?['scout','cruiser','heavy']:['cruiser','heavy'];
+  for(let i=0;i<count;i++){q.push(types[Math.floor(Math.random()*types.length)]);}
+  return q;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────
+function dst(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2);}
+function spawnP(x,y,col,n,spd=3){
+  for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=Math.random()*spd+1;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color:col,size:Math.random()*3+1.5});}
+}
+function addDmg(x,y,d,col='#fff'){dmgNums.push({x:x+(Math.random()-0.5)*12,y,dmg:d,color:col,life:1,bold:d>=50});}
+function findTarget(tw){
+  let best=null,bestD=-1;
+  for(const e of enemies){if(e.dead)continue;const d=dst(tw,e);if(d<=tw.range&&e.pathDist>bestD){best=e;bestD=e.pathDist;}}
+  return best;
+}
+function addShake(amt){shakeAmt=Math.min(shakeAmt+amt,15);}
+function addCombo(){combo++;comboTimer=180;if(combo>comboPeak)comboPeak=combo;
+  if(combo>=5){const bonus=Math.floor(combo*0.5);gold+=bonus;score+=bonus;}}
+function addEffect(fx){effects.push(fx);}
+
+// ─── Tower Fire ───────────────────────────────────────────────
+function towerFire(tw){
+  const tgt=findTarget(tw);if(!tgt)return;
+  tw.cooldown=tw.rate;tw.firing=8;
+  const tx=tgt.x,ty=tgt.y;
+
+  if(tw.type==='laser'){
+    tgt.hp-=tw.dmg;addDmg(tx,ty,tw.dmg,tw.color);spawnP(tx,ty,'#fff',3,2);
+    addEffect({type:'line',x1:tw.x,y1:tw.y,x2:tx,y2:ty,color:tw.color,life:1});
+  }else if(tw.type==='missile'){
+    projectiles.push({x:tw.x,y:tw.y,tgt,spd:5,dmg:tw.dmg,splash:60,color:tw.color,life:120});
+  }else if(tw.type==='freeze'){
+    tgt.slowTimer=120;tgt.hp-=tw.dmg;addDmg(tx,ty,tw.dmg,tw.color);
+    addEffect({type:'circle',x:tx,y:ty,r:0,maxR:30,color:'rgba(0,200,255,0.4)',life:1});
+  }else if(tw.type==='tesla'){
+    const ch=[tgt];let last=tgt;
+    for(let i=0;i<2;i++){let near=null,nd=Infinity;
+      for(const e of enemies){if(e.dead||ch.includes(e))continue;const d=dst(last,e);if(d<80&&d<nd){near=e;nd=d;}}
+      if(near){ch.push(near);last=near;}else break;}
+    let prev={x:tw.x,y:tw.y};
+    for(const e of ch){
+      addEffect({type:'lightning',x1:prev.x,y1:prev.y,x2:e.x,y2:e.y,color:tw.color,life:1});
+      e.hp-=tw.dmg;addDmg(e.x,e.y,tw.dmg,tw.color);spawnP(e.x,e.y,'#cc66ff',4,2);prev=e;
+    }
+  }else if(tw.type==='sniper'){
+    tgt.hp-=tw.dmg;addDmg(tx,ty,tw.dmg,'#ff3366');spawnP(tx,ty,'#ff3366',8,4);
+    addEffect({type:'line',x1:tw.x,y1:tw.y,x2:tx,y2:ty,color:'#ff3366',life:1});
+    addShake(3);
+  }else if(tw.type==='flame'){
+    // Hits ALL enemies in range
+    for(const e of enemies){
+      if(e.dead||dst(tw,e)>tw.range)continue;
+      e.hp-=tw.dmg;e.burnTimer=60;
+      if(Math.random()<0.3)addDmg(e.x,e.y,tw.dmg,'#ff8800');
+    }
+    addEffect({type:'circle',x:tw.x,y:tw.y,r:0,maxR:tw.range*0.5,color:'rgba(255,136,0,0.2)',life:1});
+  }
+}
+
+// ─── Spawn & Update ───────────────────────────────────────────
+function spawnEnemy(type){
+  const t=ENEMIES[type];
+  const hpMult=1+waveNum*0.12+lvl*0.25;
+  const spdMult=1+waveNum*0.01+lvl*0.03;
+  enemies.push({x:pathPixels[0].x,y:pathPixels[0].y,type,
+    hp:Math.floor(t.hp*hpMult),maxHp:Math.floor(t.hp*hpMult),
+    speed:t.speed*spdMult,
+    reward:t.reward+lvl*3,size:t.size,color:t.color,
+    pathDist:0,slowTimer:0,burnTimer:0,dead:false});
+}
+
+function update(){
+  if(paused||gameOver)return;
+
+  // Spawn
+  if(state==='waving'&&waveQueue.length>0){spawnTimer++;if(spawnTimer>=spawnInterval){spawnEnemy(waveQueue.shift());spawnTimer=0;}}
+  if(state==='waving'&&waveQueue.length===0&&enemies.length===0){
+    if(waveNum>=WAVES_LV){state=lvl<TOTAL_LV-1?'levelcomplete':'allclear';gameOver=state==='allclear';updateUI();document.getElementById('btnWave').textContent=state==='levelcomplete'?'进入下一关':'重新挑战';return;}
+    state='countdown';autoWaveTimer=180;
+    updateUI();
+  }
+  // Auto-wave countdown
+  if(state==='countdown'){
+    autoWaveTimer--;
+    document.getElementById('btnWave').textContent=`下一波 ${Math.ceil(autoWaveTimer/60)}s`;
+    if(autoWaveTimer<=0){
+      waveNum++;waveQueue=genWave(waveNum);spawnTimer=0;
+      spawnInterval=Math.max(12,42-waveNum*2-lvl);
+      state='waving';document.getElementById('btnWave').textContent='进行中...';updateUI();
+    }
+  }
+
+  // Combo timer
+  if(comboTimer>0){comboTimer--;if(comboTimer<=0)combo=0;}
+
+  // Ability cooldowns
+  for(const k in abCD)if(abCD[k]>0)abCD[k]--;
+
+  // Enemies
+  for(const e of enemies){
+    if(e.dead)continue;
+    const spd=(e.slowTimer>0?e.speed*0.4:e.speed);
+    e.pathDist+=spd;
+    const p=posOnPath(e.pathDist);e.x=p.x;e.y=p.y;
+    if(e.slowTimer>0)e.slowTimer--;
+    // Burn damage
+    if(e.burnTimer>0){e.burnTimer--;if(e.burnTimer%15===0){e.hp-=5;addDmg(e.x,e.y,5,'#ff8800');}}
+    if(e.pathDist>=totalLen){e.dead=true;lives--;if(lives<=0){lives=0;gameOver=true;state='over';}updateUI();}
+    if(e.hp<=0&&!e.dead){
+      e.dead=true;gold+=e.reward;score+=e.reward;
+      spawnP(e.x,e.y,e.color,20);addCombo();addShake(e.type==='boss'?8:3);updateUI();
+    }
+  }
+  enemies=enemies.filter(e=>!e.dead);
+
+  // Towers
+  for(const t of towers){if(t.cooldown>0)t.cooldown--;else towerFire(t);if(t.firing>0)t.firing--;}
+
+  // Projectiles
+  for(const p of projectiles){
+    if(p.tgt&&!p.tgt.dead)p.tx=p.tgt.x,p.ty=p.tgt.y;
+    else if(!p.tx){p.life=0;continue;}
+    const dx=p.tx-p.x,dy=p.ty-p.y,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<p.spd+4){
+      if(p.splash){
+        for(const e of enemies){if(!e.dead&&dst({x:p.tx,y:p.ty},e)<=p.splash){e.hp-=p.dmg;addDmg(e.x,e.y,p.dmg,p.color);}}
+        spawnP(p.tx,p.ty,'#ff8800',25,5);addEffect({type:'circle',x:p.tx,y:p.ty,r:0,maxR:p.splash,color:'rgba(255,136,0,0.4)',life:1});addShake(5);
+      }
+      p.life=0;
+    }else{p.x+=dx/d*p.spd;p.y+=dy/d*p.spd;}
+    p.life--;
+  }
+  projectiles=projectiles.filter(p=>p.life>0);
+
+  // Shake decay
+  if(shakeAmt>0){shakeX=(Math.random()-0.5)*shakeAmt;shakeY=(Math.random()-0.5)*shakeAmt;shakeAmt*=0.9;if(shakeAmt<0.3)shakeAmt=0;}else{shakeX=0;shakeY=0;}
+
+  // Effects & Particles
+  for(const f of effects)f.life-=0.06;effects=effects.filter(f=>f.life>0);
+  for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.05;p.life-=0.025;}particles=particles.filter(p=>p.life>0);
+  for(const d of dmgNums){d.y-=0.8;d.life-=0.025;}dmgNums=dmgNums.filter(d=>d.life>0);
+}
+
+// ─── Draw ─────────────────────────────────────────────────────
+function draw(){
+  ctx.save();
+  ctx.translate(shakeX,shakeY);
+
+  ctx.fillStyle='#14143a';ctx.fillRect(-5,-5,GW+10,GH+10);
+
+  // Grid
+  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;
+  for(let c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(c*CS,0);ctx.lineTo(c*CS,GH);ctx.stroke();}
+  for(let r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(0,r*CS);ctx.lineTo(GW,r*CS);ctx.stroke();}
+
+  // Path
+  for(const k of pathSet){const c=k%COLS,r=Math.floor(k/COLS);ctx.fillStyle='#162050';ctx.fillRect(c*CS+1,r*CS+1,CS-2,CS-2);}
+  ctx.strokeStyle='rgba(0,150,255,0.25)';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(pathPixels[0].x,pathPixels[0].y);
+  for(let i=1;i<pathPixels.length;i++)ctx.lineTo(pathPixels[i].x,pathPixels[i].y);ctx.stroke();
+  const ep=pathPixels[0],xp=pathPixels[pathPixels.length-1];
+  ctx.fillStyle='#00ff88';ctx.font='16px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('▶',ep.x<=20?12:ep.x,ep.y);ctx.fillStyle='#ff4466';ctx.fillText('◀',xp.x>=GW-20?GW-12:xp.x,xp.y);
+
+  // Ability targeting
+  if(abTargeting==='strike'&&hCol>=0&&hRow>=0){
+    ctx.fillStyle='rgba(255,50,50,0.15)';ctx.beginPath();ctx.arc(hCol*CS+CS/2,hRow*CS+CS/2,80,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(255,50,50,0.5)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(hCol*CS+CS/2,hRow*CS+CS/2,80,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle='rgba(255,50,50,0.3)';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(hCol*CS+CS/2,0);ctx.lineTo(hCol*CS+CS/2,GH);ctx.stroke();ctx.beginPath();ctx.moveTo(0,hRow*CS+CS/2);ctx.lineTo(GW,hRow*CS+CS/2);ctx.stroke();ctx.setLineDash([]);
+  }
+
+  // Highlight all valid placement cells with flashing yellow outline
+  if(selType){
+    const flash=0.4+Math.sin(Date.now()*0.006)*0.3;
+    ctx.strokeStyle=`rgba(255,220,0,${flash})`;
+    ctx.lineWidth=1.5;
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      if(grid[r][c]===0)ctx.strokeRect(c*CS+2,r*CS+2,CS-4,CS-4);
+    }
+  }
+
+  // Hover preview
+  if(selectedType()&&hCol>=0&&hRow>=0&&!grid[hRow][hCol]){
+    const v=validCell(hCol,hRow),t=TOWERS[selType];
+    ctx.fillStyle=v?'rgba(0,212,255,0.15)':'rgba(255,50,50,0.2)';
+    ctx.strokeStyle=v?'rgba(0,212,255,0.5)':'rgba(255,50,50,0.5)';ctx.lineWidth=2;
+    ctx.fillRect(hCol*CS+1,hRow*CS+1,CS-2,CS-2);ctx.strokeRect(hCol*CS+1,hRow*CS+1,CS-2,CS-2);
+    if(v){ctx.strokeStyle='rgba(0,212,255,0.25)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(hCol*CS+CS/2,hRow*CS+CS/2,t.range,0,Math.PI*2);ctx.stroke();}
+  }
+
+  // Selected tower range
+  if(selTower){ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(selTower.x,selTower.y,selTower.range,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='rgba(0,212,255,0.4)';ctx.lineWidth=2;ctx.strokeRect(selTower.col*CS,selTower.row*CS,CS,CS);}
+
+  // Towers
+  for(const t of towers){
+    const x=t.x,y=t.y,s=CS*0.38;
+    ctx.fillStyle='rgba(20,20,50,0.85)';ctx.beginPath();ctx.arc(x,y,s+2,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=t.color+'80';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,s+2,0,Math.PI*2);ctx.stroke();
+    // Firing flash
+    if(t.firing>0){ctx.fillStyle=t.color+'44';ctx.beginPath();ctx.arc(x,y,s+6,0,Math.PI*2);ctx.fill();}
+    if(t.type==='laser'){
+      ctx.fillStyle='#1a3040';ctx.fillRect(x-s*0.7,y-s*0.7,s*1.4,s*1.4);
+      ctx.fillStyle=t.color;ctx.fillRect(x-s*0.5,y-s*0.5,s,s);
+      ctx.strokeStyle=t.color;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(x,y-s*0.8);ctx.lineTo(x,y-s*1.15);ctx.stroke();
+      ctx.fillStyle='rgba(0,255,200,0.4)';ctx.beginPath();ctx.arc(x,y,s*0.2,0,Math.PI*2);ctx.fill();
+    }else if(t.type==='missile'){
+      ctx.fillStyle='#301a0a';ctx.beginPath();ctx.moveTo(x,y+s*0.8);ctx.lineTo(x-s*0.9,y-s*0.5);ctx.lineTo(x+s*0.9,y-s*0.5);ctx.closePath();ctx.fill();
+      ctx.fillStyle=t.color;ctx.beginPath();ctx.moveTo(x,y+s*0.5);ctx.lineTo(x-s*0.6,y-s*0.3);ctx.lineTo(x+s*0.6,y-s*0.3);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#222';for(let i=-1;i<=1;i+=2){ctx.beginPath();ctx.arc(x+i*s*0.25,y-s*0.15,3,0,Math.PI*2);ctx.fill();}
+      ctx.fillStyle='#ff3300';for(let i=-1;i<=1;i+=2){ctx.beginPath();ctx.arc(x+i*s*0.25,y-s*0.15,1.5,0,Math.PI*2);ctx.fill();}
+    }else if(t.type==='freeze'){
+      ctx.fillStyle='#0a2030';ctx.beginPath();ctx.arc(x,y,s*0.8,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=t.color+'aa';ctx.lineWidth=2;
+      for(let i=0;i<6;i++){const a=i*Math.PI/3;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*s*0.55,y+Math.sin(a)*s*0.55);ctx.stroke();}
+      ctx.fillStyle=t.color+'55';ctx.beginPath();ctx.arc(x,y,s*0.35,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,s*0.12,0,Math.PI*2);ctx.fill();
+    }else if(t.type==='tesla'){
+      ctx.fillStyle='#1a0a30';ctx.beginPath();ctx.arc(x,y,s*0.6,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=t.color+'88';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,s*0.6,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(x,y,s*0.35,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle=t.color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y-s*0.6);ctx.lineTo(x,y-s*0.95);ctx.stroke();
+      const sp=Math.random()*Math.PI*2;ctx.strokeStyle=t.color+'cc';ctx.lineWidth=1;
+      for(let i=0;i<3;i++){const a=sp+i*Math.PI*2/3;ctx.beginPath();ctx.moveTo(x+Math.cos(a)*s*0.35,y+Math.sin(a)*s*0.35);ctx.lineTo(x+Math.cos(a+0.2)*s*0.6,y+Math.sin(a+0.2)*s*0.6);ctx.stroke();}
+    }else if(t.type==='sniper'){
+      ctx.fillStyle='#2a0a15';ctx.beginPath();ctx.moveTo(x,y+s*0.8);ctx.lineTo(x-s*0.5,y-s*0.3);ctx.lineTo(x+s*0.5,y-s*0.3);ctx.closePath();ctx.fill();
+      ctx.fillStyle=t.color;ctx.beginPath();ctx.moveTo(x,y+s*0.5);ctx.lineTo(x-s*0.3,y-s*0.1);ctx.lineTo(x+s*0.3,y-s*0.1);ctx.closePath();ctx.fill();
+      ctx.strokeStyle=t.color;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y-s*0.3);ctx.lineTo(x,y-s*1.2);ctx.stroke();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y-s*1.2,2,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=t.color+'55';ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y-s*0.3,s*0.2,0,Math.PI*2);ctx.stroke();
+    }else if(t.type==='flame'){
+      ctx.fillStyle='#2a1500';ctx.beginPath();ctx.arc(x,y,s*0.7,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=t.color;ctx.beginPath();ctx.arc(x,y,s*0.45,0,Math.PI*2);ctx.fill();
+      // Flickering flames
+      for(let i=0;i<4;i++){const a=i*Math.PI/2+Date.now()*0.003,h=s*0.4+Math.random()*s*0.3;
+        ctx.fillStyle=['#ff8800','#ffcc00','#ff4400','#ff6600'][i];ctx.globalAlpha=0.6;
+        ctx.beginPath();ctx.moveTo(x+Math.cos(a)*s*0.2,y+Math.sin(a)*s*0.2);ctx.lineTo(x+Math.cos(a-0.2)*(s*0.2+h),y+Math.sin(a-0.2)*(s*0.2+h));ctx.lineTo(x+Math.cos(a+0.2)*(s*0.2+h),y+Math.sin(a+0.2)*(s*0.2+h));ctx.closePath();ctx.fill();ctx.globalAlpha=1;}
+    }
+    const pulse=0.12+Math.sin(Date.now()*0.004)*0.06;
+    ctx.fillStyle=t.color;ctx.globalAlpha=pulse;ctx.beginPath();ctx.arc(x,y,s*0.7,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    if(t.level>1){ctx.fillStyle='#ffcc00';ctx.font='bold 9px Arial';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('★'.repeat(t.level-1),x,y-s-5);}
+  }
+
+  // Enemies
+  for(const e of enemies){
+    const sz=e.size;ctx.save();ctx.translate(e.x,e.y);
+    ctx.fillStyle=e.color;ctx.globalAlpha=0.25;ctx.beginPath();ctx.arc(0,sz*0.3,sz*0.6,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    if(e.type==='scout'){
+      ctx.fillStyle=e.color;ctx.beginPath();ctx.moveTo(0,-sz);ctx.lineTo(-sz*0.35,sz*0.5);ctx.lineTo(-sz*0.15,sz*0.3);ctx.lineTo(0,sz*0.7);ctx.lineTo(sz*0.15,sz*0.3);ctx.lineTo(sz*0.35,sz*0.5);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-sz*0.3,2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=e.color+'66';ctx.beginPath();ctx.moveTo(-sz*0.1,sz*0.7);ctx.lineTo(0,sz+4+Math.random()*3);ctx.lineTo(sz*0.1,sz*0.7);ctx.closePath();ctx.fill();
+    }else if(e.type==='cruiser'){
+      ctx.fillStyle=e.color;ctx.beginPath();ctx.moveTo(0,-sz);ctx.lineTo(-sz*0.8,-sz*0.3);ctx.lineTo(-sz*0.8,sz*0.5);ctx.lineTo(0,sz*0.8);ctx.lineTo(sz*0.8,sz*0.5);ctx.lineTo(sz*0.8,-sz*0.3);ctx.closePath();ctx.fill();
+      ctx.fillStyle=e.color+'aa';ctx.beginPath();ctx.moveTo(0,-sz*0.6);ctx.lineTo(-sz*0.4,-sz*0.1);ctx.lineTo(-sz*0.4,sz*0.3);ctx.lineTo(0,sz*0.5);ctx.lineTo(sz*0.4,sz*0.3);ctx.lineTo(sz*0.4,-sz*0.1);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-sz*0.2,2.5,0,Math.PI*2);ctx.fill();
+    }else if(e.type==='heavy'){
+      ctx.fillStyle=e.color;ctx.beginPath();ctx.moveTo(0,-sz);ctx.lineTo(-sz*0.7,-sz*0.5);ctx.lineTo(-sz,sz*0.2);ctx.lineTo(-sz*0.6,sz*0.8);ctx.lineTo(sz*0.6,sz*0.8);ctx.lineTo(sz,sz*0.2);ctx.lineTo(sz*0.7,-sz*0.5);ctx.closePath();ctx.fill();
+      ctx.fillStyle=e.color+'bb';ctx.beginPath();ctx.moveTo(0,-sz*0.5);ctx.lineTo(-sz*0.5,0);ctx.lineTo(-sz*0.4,sz*0.4);ctx.lineTo(sz*0.4,sz*0.4);ctx.lineTo(sz*0.5,0);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#fff';for(let i=-1;i<=1;i+=2){ctx.beginPath();ctx.arc(i*sz*0.25,-sz*0.3,2,0,Math.PI*2);ctx.fill();}
+    }else{
+      ctx.fillStyle=e.color;ctx.beginPath();ctx.arc(0,0,sz,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=e.color+'88';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,sz+5,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle=e.color+'66';for(let i=0;i<6;i++){const a=i*Math.PI/3+Date.now()*0.001;ctx.beginPath();ctx.arc(Math.cos(a)*sz*0.5,Math.sin(a)*sz*0.5,3,0,Math.PI*2);ctx.fill();}
+      ctx.fillStyle='rgba(255,255,255,0.5)';ctx.beginPath();ctx.arc(0,0,sz*0.35,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=e.color+'cc';ctx.lineWidth=2;const rot=Date.now()*0.002;for(let i=0;i<4;i++){const a=rot+i*Math.PI/2;ctx.beginPath();ctx.arc(0,0,sz+5,a,a+0.8);ctx.stroke();}
+    }
+    // Burn effect
+    if(e.burnTimer>0){ctx.strokeStyle='rgba(255,136,0,0.5)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,sz+2,0,Math.PI*2);ctx.stroke();}
+    if(e.slowTimer>0){ctx.strokeStyle='rgba(0,200,255,0.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,sz+2,0,Math.PI*2);ctx.stroke();}
+    ctx.restore();
+    if(e.hp<e.maxHp){const bw=sz*2,bh=3,bx=e.x-bw/2,by=e.y-sz-8;ctx.fillStyle='#333';ctx.fillRect(bx,by,bw,bh);ctx.fillStyle=e.hp/e.maxHp>0.5?'#0f0':e.hp/e.maxHp>0.25?'#ff0':'#f00';ctx.fillRect(bx,by,bw*(e.hp/e.maxHp),bh);}
+  }
+
+  // Projectiles
+  for(const p of projectiles){ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
+
+  // Effects
+  for(const f of effects){
+    ctx.globalAlpha=f.life;
+    if(f.type==='line'){ctx.strokeStyle=f.color;ctx.lineWidth=2*f.life;ctx.shadowColor=f.color;ctx.shadowBlur=10*f.life;ctx.beginPath();ctx.moveTo(f.x1,f.y1);ctx.lineTo(f.x2,f.y2);ctx.stroke();ctx.shadowBlur=0;}
+    else if(f.type==='circle'){const r=f.maxR*(1-f.life);ctx.strokeStyle=f.color;ctx.lineWidth=2*f.life;ctx.beginPath();ctx.arc(f.x,f.y,r,0,Math.PI*2);ctx.stroke();}
+    else if(f.type==='lightning'){ctx.strokeStyle=f.color;ctx.lineWidth=2;ctx.shadowColor=f.color;ctx.shadowBlur=10;ctx.beginPath();ctx.moveTo(f.x1,f.y1);const mxx=(f.x1+f.x2)/2+(Math.random()-0.5)*20,myy=(f.y1+f.y2)/2+(Math.random()-0.5)*20;ctx.quadraticCurveTo(mxx,myy,f.x2,f.y2);ctx.stroke();ctx.shadowBlur=0;}
+    ctx.globalAlpha=1;
+  }
+  // Particles
+  for(const p of particles){ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);}ctx.globalAlpha=1;
+  // Dmg nums
+  for(const d of dmgNums){ctx.globalAlpha=d.life;ctx.fillStyle=d.color;ctx.font=d.bold?'bold 14px Arial':'bold 11px Arial';ctx.textAlign='center';ctx.fillText(d.dmg,d.x,d.y);}ctx.globalAlpha=1;
+
+  // Combo display
+  if(combo>=3){
+    ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=`rgba(255,200,0,${Math.min(1,comboTimer/60)})`;ctx.font=`bold ${Math.min(28,16+combo)}px Arial`;
+    ctx.fillText(`${combo} 连杀！`,GW/2,40);
+    if(combo>=10){ctx.fillStyle=`rgba(255,100,0,${Math.min(1,comboTimer/60)})`;ctx.font='14px Arial';ctx.fillText(`+${Math.floor(combo*0.5)} 金币奖励`,GW/2,62);}
+    ctx.restore();
+  }
+
+  // Overlays
+  if(state==='levelcomplete'){
+    ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(0,0,GW,GH);ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#00d4ff';ctx.font='bold 34px Arial';ctx.fillText(`第 ${lvl+1} 关 通关！`,GW/2,GH/2-50);
+    ctx.fillStyle='#ffcc00';ctx.font='22px Arial';ctx.fillText(LEVELS[lvl].name,GW/2,GH/2-10);
+    ctx.fillStyle='#aaa';ctx.font='16px Arial';ctx.fillText(`下一关: ${LEVELS[lvl+1].name}`,GW/2,GH/2+30);
+    ctx.fillText('点击「进入下一关」继续',GW/2,GH/2+65);
+  }else if(state==='allclear'){
+    ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,GW,GH);ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#00ff88';ctx.font='bold 40px Arial';ctx.fillText('全 部 通 关 ！',GW/2,GH/2-40);
+    ctx.fillStyle='#ffcc00';ctx.font='24px Arial';ctx.fillText('最终得分: '+score,GW/2,GH/2+15);
+    ctx.fillStyle='#aaa';ctx.font='16px Arial';ctx.fillText('最高连杀: '+comboPeak,GW/2,GH/2+45);
+    ctx.fillText('点击「重新挑战」再来一次',GW/2,GH/2+75);
+  }else if(state==='over'){
+    ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,GW,GH);ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#ff4444';ctx.font='bold 36px Arial';ctx.fillText('游 戏 结 束',GW/2,GH/2-30);
+    ctx.fillStyle='#ffcc00';ctx.font='22px Arial';ctx.fillText(`第 ${lvl+1} 关 · ${LEVELS[lvl].name}`,GW/2,GH/2+10);
+    ctx.fillStyle='#aaa';ctx.font='16px Arial';ctx.fillText('点击「开始波次」重新开始',GW/2,GH/2+50);
+  }
+
+  ctx.restore();
+}
+function selectedType(){return selType;}
+
+// ─── UI ───────────────────────────────────────────────────────
+function updateUI(){
+  document.getElementById('levelVal').textContent=(lvl+1)+'/'+TOTAL_LV;
+  document.getElementById('waveVal').textContent=waveNum+'/'+WAVES_LV;
+  document.getElementById('goldVal').textContent=gold;
+  document.getElementById('livesVal').textContent=lives;
+  document.getElementById('scoreVal').textContent=score;
+  document.getElementById('comboVal').textContent=combo;
+  // Mobile stats
+  const mL=document.getElementById('mLevel'),mW=document.getElementById('mWave'),mG=document.getElementById('mGold'),mLs=document.getElementById('mLives'),mC=document.getElementById('mCombo');
+  if(mL)mL.textContent=(lvl+1)+'/'+TOTAL_LV;
+  if(mW)mW.textContent=waveNum+'/'+WAVES_LV;
+  if(mG)mG.textContent=gold;
+  if(mLs)mLs.textContent=lives;
+  if(mC)mC.textContent=combo;
+  const lv=LEVELS[lvl];
+  document.getElementById('waveInfo').textContent=
+    state==='waving'?`${lv.name} · 第${waveNum}波 剩余${enemies.length+waveQueue.length}架`:
+    state==='levelcomplete'?`${lv.name} 通关！`:
+    state==='allclear'?'全部通关！':
+    gameOver?`${lv.name} 失败`:
+    `${lv.name} · 准备就绪`;
+  for(const[id,t]of Object.entries(TOWERS)){const card=document.getElementById('tc-'+id);if(card){card.classList.toggle('disabled',gold<t.cost);card.classList.toggle('selected',selType===id);}}
+  // Ability buttons (desktop + mobile)
+  const abKeys=[['strike','abStrike','mStrike'],['emp','abEMP','mEMP'],['repair','abRepair','mRepair']];
+  for(const[k,deskId,mobId]of abKeys){
+    const cd=abCD[k];
+    for(const id of[deskId,mobId]){
+      const el=document.getElementById(id);if(!el)continue;
+      el.classList.toggle('ready',cd<=0);el.classList.toggle('active',abTargeting===k);
+      const overlay=el.querySelector('.cd-overlay');
+      if(overlay)overlay.textContent=cd>0?Math.ceil(cd/60)+'s':'';
+    }
+  }
+  // Mobile tower cards
+  document.querySelectorAll('.m-tower').forEach(el=>{
+    const id=el.dataset.type;const t=TOWERS[id];
+    el.classList.toggle('disabled',gold<t.cost);el.classList.toggle('selected',selType===id);
+  });
+  // Mobile wave button text
+  const mWaveBtn=document.getElementById('mWave');
+  if(mWaveBtn)mWaveBtn.textContent=document.getElementById('btnWave').textContent;
+}
+
+function showTowerInfo(tw){
+  selTower=tw;const info=document.getElementById('towerInfo');
+  if(!tw){info.classList.remove('show');return;}
+  const t=TOWERS[tw.type],upgCost=tw.level<3?Math.floor(t.cost*UPG_C*tw.level):0,sellVal=Math.floor(tw.totalCost*0.6);
+  const extra=tw.type==='freeze'?'减速: <span>50%</span>':tw.type==='missile'?'溅射: <span>60px</span>':tw.type==='tesla'?'链式: <span>3目标</span>':tw.type==='sniper'?'暴击: <span>高伤</span>':tw.type==='flame'?'灼烧: <span>持续</span>':'';
+  info.innerHTML=`<div class="ti-header"><div class="ti-icon" style="background:${tw.color}20;border:2px solid ${tw.color}">${t.icon}</div><div><div class="ti-name">${t.name}</div><div class="ti-level">Lv.${tw.level} ${tw.level>=3?'(满级)':''}</div></div></div><div class="ti-stats">伤害: <span>${tw.dmg}</span></div><div class="ti-stats">射程: <span>${tw.range}</span></div><div class="ti-stats">攻速: <span>${(60/tw.rate).toFixed(1)}/s</span></div>${extra?'<div class="ti-stats">'+extra+'</div>':''}<div class="ti-btns"><div class="ti-btn upgrade ${tw.level>=3||gold<upgCost?'disabled':''}" id="btnUpgrade">${tw.level>=3?'已满级':'升级 💰'+upgCost}</div><div class="ti-btn sell" id="btnSell">出售 💰${sellVal}</div></div>`;
+  info.classList.add('show');
+  document.getElementById('btnUpgrade').onclick=()=>{if(tw.level>=3||gold<upgCost)return;gold-=upgCost;tw.level++;tw.totalCost+=upgCost;tw.dmg=Math.floor(tw.dmg*UPG_M);tw.range=Math.floor(tw.range*1.1);tw.rate=Math.max(6,Math.floor(tw.rate*0.9));updateUI();showTowerInfo(tw);};
+  document.getElementById('btnSell').onclick=()=>{gold+=sellVal;grid[tw.row][tw.col]=0;towers=towers.filter(t=>t!==tw);selTower=null;updateUI();showTowerInfo(null);};
+}
+
+function buildShop(){
+  const shop=document.getElementById('shop');
+  for(const[id,t]of Object.entries(TOWERS)){
+    const card=document.createElement('div');card.className='tower-card';card.id='tc-'+id;
+    card.innerHTML=`<div class="tc-top"><div class="tc-icon" style="background:${t.color}20;border:2px solid ${t.color}">${t.icon}</div><div><div class="tc-name">${t.name}</div><div class="tc-cost">💰 ${t.cost}</div></div></div><div class="tc-desc">${t.desc} | 伤害${t.dmg} | 射程${t.range}</div>`;
+    card.onclick=()=>{if(gold<t.cost)return;selType=selType===id?null:id;selTower=null;showTowerInfo(null);updateUI();};
+    shop.appendChild(card);
+  }
+}
+
+// ─── Mobile Panel ─────────────────────────────────────────────
+function buildMobilePanel(){
+  const mt=document.getElementById('mTowers');
+  for(const[id,t]of Object.entries(TOWERS)){
+    const el=document.createElement('div');el.className='m-tower';el.dataset.type=id;
+    el.innerHTML=`<div class="mt-icon">${t.icon}</div><div class="mt-name">${t.name}</div><div class="mt-cost">💰${t.cost}</div>`;
+    // Tap to select
+    el.addEventListener('click',()=>{
+      if(gold<t.cost)return;
+      selType=selType===id?null:id;selTower=null;showTowerInfo(null);updateUI();
+    });
+    // Drag to place
+    el.addEventListener('touchstart',e=>{
+      if(gold<t.cost)return;
+      e.preventDefault();
+      const t0=e.touches[0];
+      dragType=id;
+      const ghost=document.getElementById('dragGhost');
+      ghost.textContent=TOWERS[id].icon;ghost.style.display='block';
+      ghost.style.left=(t0.clientX-16)+'px';ghost.style.top=(t0.clientY-16)+'px';
+      selType=id;selTower=null;updateUI();
+    },{passive:false});
+    mt.appendChild(el);
+  }
+  // Mobile bottom buttons
+  const mWaveBtn=document.getElementById('mWave');
+  mWaveBtn.addEventListener('click',()=>document.getElementById('btnWave').click());
+  document.getElementById('mSpeed').addEventListener('click',()=>document.getElementById('btnSpeed').click());
+  document.getElementById('mPause').addEventListener('click',()=>document.getElementById('btnPause').click());
+  document.getElementById('mStrike').addEventListener('click',()=>useAbility('strike'));
+  document.getElementById('mEMP').addEventListener('click',()=>useAbility('emp'));
+  document.getElementById('mRepair').addEventListener('click',()=>useAbility('repair'));
+}
+let dragType=null;
+
+// ─── Abilities ────────────────────────────────────────────────
+function useAbility(k){
+  if(abCD[k]>0||gameOver)return;
+  if(k==='strike'){abTargeting=abTargeting==='strike'?null:'strike';updateUI();return;}
+  if(k==='emp'){
+    abCD.emp=ABILITIES.emp.cd;
+    for(const e of enemies){if(!e.dead)e.slowTimer=ABILITIES.emp.slowDur;}
+    addEffect({type:'circle',x:GW/2,y:GH/2,r:0,maxR:Math.max(GW,GH),color:'rgba(0,150,255,0.15)',life:1});
+    spawnP(GW/2,GH/2,'#00ccff',40,6);addShake(4);
+  }else if(k==='repair'){
+    abCD.repair=ABILITIES.repair.cd;lives=Math.min(20,lives+ABILITIES.repair.heal);
+    spawnP(GW/2,GH/2,'#00ff88',30,5);updateUI();
+  }
+  abTargeting=null;updateUI();
+}
+function executeStrike(tx,ty){
+  abCD.strike=ABILITIES.strike.cd;
+  const r=ABILITIES.strike.radius,d=ABILITIES.strike.dmg;
+  for(const e of enemies){if(!e.dead&&dst({x:tx,y:ty},e)<=r){e.hp-=d;addDmg(e.x,e.y,d,'#ff3333');}}
+  addEffect({type:'circle',x:tx,y:ty,r:0,maxR:r,color:'rgba(255,50,50,0.5)',life:1});
+  spawnP(tx,ty,'#ff4444',50,8);spawnP(tx,ty,'#ffcc00',30,6);addShake(12);
+  abTargeting=null;updateUI();
+}
+
+// ─── Input ────────────────────────────────────────────────────
+canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect();mx=(e.clientX-r.left)*(GW/r.width);my=(e.clientY-r.top)*(GH/r.height);hCol=Math.floor(mx/CS);hRow=Math.floor(my/CS);});
+canvas.addEventListener('mouseleave',()=>{hCol=-1;hRow=-1;});
+
+canvas.addEventListener('click',()=>{
+  const c=hCol,r=hRow;if(c<0||r<0||c>=COLS||r>=ROWS)return;
+
+  // Ability targeting
+  if(abTargeting==='strike'){executeStrike(c*CS+CS/2,r*CS+CS/2);return;}
+
+  // Place tower
+  if(selType&&!grid[r][c]&&validCell(c,r)){
+    const t=TOWERS[selType];if(gold<t.cost)return;gold-=t.cost;
+    towers.push({type:selType,col:c,row:r,x:c*CS+CS/2,y:r*CS+CS/2,dmg:t.dmg,range:t.range,rate:t.rate,cooldown:0,level:1,color:t.color,totalCost:t.cost,firing:0});
+    grid[r][c]=2;updateUI();return;
+  }
+  // Select tower
+  const clicked=towers.find(t=>t.col===c&&t.row===r);
+  if(clicked){selType=null;selTower=clicked;showTowerInfo(clicked);updateUI();return;}
+  // Deselect
+  selType=null;selTower=null;abTargeting=null;showTowerInfo(null);updateUI();
+});
+
+// Right-click cancel
+canvas.addEventListener('contextmenu',e=>{e.preventDefault();abTargeting=null;selType=null;selTower=null;showTowerInfo(null);updateUI();});
+
+// ─── Touch support ────────────────────────────────────────────
+let touchStartX=0,touchStartY=0,touchMoved=false;
+
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const t=e.touches[0],r=canvas.getBoundingClientRect();
+  mx=(t.clientX-r.left)*(GW/r.width);my=(t.clientY-r.top)*(GH/r.height);
+  hCol=Math.floor(mx/CS);hRow=Math.floor(my/CS);
+  touchStartX=t.clientX;touchStartY=t.clientY;touchMoved=false;
+},{passive:false});
+
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const t=e.touches[0],r=canvas.getBoundingClientRect();
+  mx=(t.clientX-r.left)*(GW/r.width);my=(t.clientY-r.top)*(GH/r.height);
+  hCol=Math.floor(mx/CS);hRow=Math.floor(my/CS);
+  if(Math.abs(t.clientX-touchStartX)>8||Math.abs(t.clientY-touchStartY)>8)touchMoved=true;
+  // Update drag ghost position
+  if(dragType){const ghost=document.getElementById('dragGhost');ghost.style.left=(t.clientX-16)+'px';ghost.style.top=(t.clientY-16)+'px';}
+},{passive:false});
+
+canvas.addEventListener('touchend',e=>{
+  e.preventDefault();
+  // Drag-and-drop placement
+  if(dragType){
+    const ghost=document.getElementById('dragGhost');ghost.style.display='none';
+    if(hCol>=0&&hRow>=0&&hCol<COLS&&hRow<ROWS&&!grid[hRow][hCol]&&validCell(hCol,hRow)){
+      const t=TOWERS[dragType];
+      if(gold>=t.cost){
+        gold-=t.cost;
+        grid[hRow][hCol]=2;
+        towers.push({type:dragType,col:hCol,row:hRow,x:hCol*CS+CS/2,y:hRow*CS+CS/2,
+          dmg:t.dmg,range:t.range,rate:t.rate,cooldown:0,level:1,color:t.color,totalCost:t.cost,firing:0});
+        selType=null;updateUI();
+      }
+    }
+    dragType=null;return;
+  }
+  if(!touchMoved)canvas.click();
+},{passive:false});
+
+document.addEventListener('touchmove',e=>{if(e.target===canvas)e.preventDefault();},{passive:false});
+
+document.getElementById('btnWave').onclick=()=>{
+  if(state==='levelcomplete'){initLevel(lvl+1,true);return;}
+  if(state==='over'||state==='allclear'){initLevel(0,false);return;}
+  if(state==='waving')return;
+  if(state==='countdown'){autoWaveTimer=0;return;}
+  waveNum++;waveQueue=genWave(waveNum);spawnTimer=0;
+  spawnInterval=Math.max(12,42-waveNum*2-lvl);
+  state='waving';document.getElementById('btnWave').textContent='进行中...';updateUI();
+};
+document.getElementById('btnSpeed').onclick=function(){speed=speed===1?2:speed===2?3:1;this.textContent=speed+'x';};
+document.getElementById('btnPause').onclick=()=>{paused=!paused;document.getElementById('btnPause').textContent=paused?'继续':'暂停';};
+document.getElementById('abStrike').onclick=()=>useAbility('strike');
+document.getElementById('abEMP').onclick=()=>useAbility('emp');
+document.getElementById('abRepair').onclick=()=>useAbility('repair');
+
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'){e.preventDefault();document.getElementById('btnWave').click();}
+  if(e.code==='KeyP')document.getElementById('btnPause').click();
+  if(e.code==='Escape'){selType=null;selTower=null;abTargeting=null;showTowerInfo(null);updateUI();}
+  if(e.code==='Digit1')document.getElementById('tc-laser')?.click();
+  if(e.code==='Digit2')document.getElementById('tc-missile')?.click();
+  if(e.code==='Digit3')document.getElementById('tc-freeze')?.click();
+  if(e.code==='Digit4')document.getElementById('tc-tesla')?.click();
+  if(e.code==='Digit5')document.getElementById('tc-sniper')?.click();
+  if(e.code==='Digit6')document.getElementById('tc-flame')?.click();
+  if(e.code==='KeyQ')useAbility('strike');
+  if(e.code==='KeyW')useAbility('emp');
+  if(e.code==='KeyE')useAbility('repair');
+});
+
+// ─── Loop ─────────────────────────────────────────────────────
+let lastT=0;
+function loop(ts){const dt=ts-lastT;if(dt>=16/speed){lastT=ts;update();draw();}requestAnimationFrame(loop);}
+buildShop();buildMobilePanel();initLevel(0,false);resizeCanvas();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
